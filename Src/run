@@ -2,7 +2,11 @@ from lxml import html
 import requests
 from PIL import Image
 from io import BytesIO
-import dill
+import numpy as np
+import cv2
+import os
+import numpy as np
+from skimage import io, color
 
 imdb_base_link = 'http://www.imdb.com'
 imdb_250_list_link = 'http://www.imdb.com/chart/top?ref_=nv_mv_250_6'
@@ -11,7 +15,8 @@ imdb_250_page = requests.get(imdb_250_list_link)
 imdb_250_tree = html.fromstring(imdb_250_page.content)
 imdb_250_links = imdb_250_tree.xpath('//td[@class="titleColumn"]/a/@href')
 
-img_list = []
+img_dir = 'Data/Images/'
+
 for i in range(0,len(imdb_250_links)):
     print(i)
     temp_movie_link = imdb_base_link + imdb_250_links[i]
@@ -21,15 +26,40 @@ for i in range(0,len(imdb_250_links)):
     
     temp_img_response = requests.get(temp_movie_poster_link[0])
     temp_img = Image.open(BytesIO(temp_img_response.content))
-    img_list.append(temp_img)
     
-# reduce color
-img_list_5_colors = []
-for img in img_list:
-    temp_reduced = img.convert('P', palette=Image.ADAPTIVE, colors=5)
-    img_list_5_colors.append(temp_reduced)
+    temp_file = img_dir + str(i) + '.jpeg'
+    temp_img.save(temp_file)
 
+img_file_names = os.listdir(img_dir)
 
-img_list_5_colors[5].show()
+os.mkdir(img_dir + '/reduced')
 
-dill.dump_session('Documents/Data_Science/Project_Movie_Posters/session.pkl')
+# http://docs.opencv.org/3.0-beta/doc/py_tutorials/py_ml/py_kmeans/py_kmeans_opencv/py_kmeans_opencv.html
+
+main_colors_list = []
+for i in range(0, len(img_file_names)):
+    print(i)
+    temp_img = cv2.imread(img_dir + img_file_names[i])
+    # reshape
+    temp_img_reshaped = temp_img.reshape((-1,3))
+    # convert to np.float32
+    temp_img_float32 = np.float32(temp_img_reshaped)
+    # define criteria, number of clusters(K) and apply kmeans()
+    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
+    K = 8
+    ret,label,center = cv2.kmeans(temp_img_float32, K, None, criteria, 10, cv2.KMEANS_RANDOM_CENTERS)
+    # Now convert back into uint8, and make original image
+    center = np.uint8(center)
+    res = center[label.flatten()]
+    temp_img_final = res.reshape((temp_img.shape))
+    
+    main_colors_list.append(center)
+    cv2.imwrite(img_dir + '/reduced/' + img_file_names[i], temp_img_final)
+
+main_colors_list[1]
+
+# http://stackoverflow.com/questions/13405956/convert-an-image-rgb-lab-with-python
+rgb = io.imread(filename)
+lab = color.rgb2lab(rgb)
+
+# http://stackoverflow.com/questions/9018016/how-to-compare-two-colors
