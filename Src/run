@@ -1,0 +1,35 @@
+from lxml import html
+import requests
+from PIL import Image
+from io import BytesIO
+import dill
+
+imdb_base_link = 'http://www.imdb.com'
+imdb_250_list_link = 'http://www.imdb.com/chart/top?ref_=nv_mv_250_6'
+
+imdb_250_page = requests.get(imdb_250_list_link)
+imdb_250_tree = html.fromstring(imdb_250_page.content)
+imdb_250_links = imdb_250_tree.xpath('//td[@class="titleColumn"]/a/@href')
+
+img_list = []
+for i in range(0,len(imdb_250_links)):
+    print(i)
+    temp_movie_link = imdb_base_link + imdb_250_links[i]
+    temp_movie_page = requests.get(temp_movie_link)
+    temp_movie_tree = html.fromstring(temp_movie_page.content)
+    temp_movie_poster_link = temp_movie_tree.xpath('//div[@class="poster"]/a/img/@src')
+    
+    temp_img_response = requests.get(temp_movie_poster_link[0])
+    temp_img = Image.open(BytesIO(temp_img_response.content))
+    img_list.append(temp_img)
+    
+# reduce color
+img_list_5_colors = []
+for img in img_list:
+    temp_reduced = img.convert('P', palette=Image.ADAPTIVE, colors=5)
+    img_list_5_colors.append(temp_reduced)
+
+
+img_list_5_colors[5].show()
+
+dill.dump_session('Documents/Data_Science/Project_Movie_Posters/session.pkl')
